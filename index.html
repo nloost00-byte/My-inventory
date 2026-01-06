@@ -3,65 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Inventory Pro Mobile</title>
+    <title>Cloud Inventory</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
-        :root {
-            --primary: #2563eb;
-            --danger: #ef4444;
-            --success: #22c55e;
-            --bg: #f1f5f9;
-        }
+        :root { --primary: #2563eb; --danger: #ef4444; --success: #22c55e; --bg: #f1f5f9; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 10px; padding-bottom: 80px; }
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; }
-        
-        h2 { font-size: 1rem; margin-top: 0; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
-        
-        input, select, button { 
-            width: 100%; padding: 14px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box;
-        }
-
-        .search-input {
-            background-color: #fff; border: 2px solid var(--primary); margin-bottom: 15px;
-            padding-left: 15px;
-        }
-        
+        input, select, button { width: 100%; padding: 14px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
         .btn-post { background: var(--success); }
-        .btn-csv { background: #64748b; font-size: 0.8rem; }
-        .btn-del { background: #fee2e2; color: var(--danger); padding: 8px; width: auto; font-size: 0.7rem; margin: 0; border-radius: 6px; }
-
-        .table-container { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 350px; }
-        th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
-        
-        .low-stock { background: #fee2e2; color: #b91c1c; font-weight: bold; border-radius: 4px; padding: 2px 5px; }
-        
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        
+        .btn-del { background: #fee2e2; color: var(--danger); padding: 8px; width: auto; font-size: 0.7rem; border-radius: 6px; }
         .nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; border-top: 1px solid #e2e8f0; z-index: 100; }
         .nav-item { flex: 1; text-align: center; padding: 15px 5px; font-size: 0.7rem; color: #64748b; cursor: pointer; }
         .nav-item.active { color: var(--primary); font-weight: bold; border-top: 3px solid var(--primary); }
-
-        .hist-item { border-left: 4px solid var(--primary); padding-left: 10px; margin-bottom: 10px; font-size: 0.8rem; }
-        .hist-in { border-color: var(--success); }
-        .hist-out { border-color: var(--danger); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
     </style>
 </head>
 <body>
 
-    <h1 style="text-align:center; font-size: 1.2rem; color: var(--primary);">Inventory Pro Mobile</h1>
+    <h1 style="text-align:center; font-size: 1.2rem; color: var(--primary);">Cloud Inventory Pro</h1>
 
     <div id="tab-dash" class="tab-content active">
         <div class="card">
-            <h2>Search Inventory</h2>
-            <input type="text" id="searchInput" class="search-input" placeholder="Search code or description..." onkeyup="render()">
-            <div class="table-container">
-                <table id="invTable">
-                    <thead><tr><th>Item</th><th>Qty</th><th>Status</th><th>Action</th></tr></thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+            <h2>Inventory Levels</h2>
+            <input type="text" id="searchInput" placeholder="Search..." onkeyup="render()">
+            <table>
+                <thead><tr><th>Item</th><th>Qty</th><th>Action</th></tr></thead>
+                <tbody id="invTableBody"></tbody>
+            </table>
         </div>
     </div>
 
@@ -73,18 +46,8 @@
                 <option value="IN">Stock IN (+)</option>
                 <option value="OUT">Stock OUT (-)</option>
             </select>
-            <input type="number" id="move-qty" placeholder="Quantity" inputmode="numeric">
-            <input type="text" id="move-inv" placeholder="Invoice # / Supplier">
-            <input type="text" id="move-rem" placeholder="Remarks">
-            <button class="btn-post" onclick="recordMovement()">Submit Movement</button>
-        </div>
-    </div>
-
-    <div id="tab-hist" class="tab-content">
-        <div class="card">
-            <h2>Transaction History</h2>
-            <div id="historyList"></div>
-            <button class="btn-csv" onclick="clearHistory()" style="margin-top:10px; background:#ef4444;">Clear All History</button>
+            <input type="number" id="move-qty" placeholder="Quantity">
+            <button class="btn-post" onclick="recordMovement()">Update Cloud</button>
         </div>
     </div>
 
@@ -93,89 +56,84 @@
             <h2>Add New Item</h2>
             <input type="text" id="m-code" placeholder="Item Code">
             <input type="text" id="m-desc" placeholder="Description">
-            <input type="number" id="m-min" placeholder="Min Stock Level" inputmode="numeric">
-            <button onclick="addItemMaster()">Create Item</button>
-        </div>
-        <div class="card">
-            <h2>Data Tools</h2>
-            <p style="font-size:0.7rem; color:#64748b;">CSV Order: Code, Desc, Min, Qty</p>
-            <input type="file" id="csvFile" accept=".csv" class="btn-csv">
-            <button class="btn-csv" onclick="importCSV()">Import CSV (4 Columns)</button>
-            <button class="btn-csv" style="margin-top:5px;" onclick="exportInventory()">Export Inventory</button>
+            <button onclick="addItemMaster()">Add to Cloud</button>
         </div>
     </div>
 
     <div class="nav">
         <div class="nav-item active" onclick="switchTab('tab-dash', this)">Levels</div>
         <div class="nav-item" onclick="switchTab('tab-move', this)">Move</div>
-        <div class="nav-item" onclick="switchTab('tab-hist', this)">History</div>
         <div class="nav-item" onclick="switchTab('tab-setup', this)">Settings</div>
     </div>
 
 <script>
-    let inventory = JSON.parse(localStorage.getItem('mob_inv_master')) || [];
-    let history = JSON.parse(localStorage.getItem('mob_inv_history')) || [];
-    
-    function switchTab(tabId, el) {
-        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        el.classList.add('active');
-        if(tabId === 'tab-hist') renderHistory();
-        render(); 
-    }
+    const firebaseConfig = {
+  apiKey: "AIzaSyBUvFkq-IyvL4DhXYv_zODzqcEs-hmvxZI",
+  authDomain: "my-inventory-e1eb4.firebaseapp.com",
+  projectId: "my-inventory-e1eb4",
+  storageBucket: "my-inventory-e1eb4.firebasestorage.app",
+  messagingSenderId: "753821889716",
+  appId: "1:753821889716:web:e377500d6ccb64586d53e1"
+};
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
 
-    function saveData() {
-        localStorage.setItem('mob_inv_master', JSON.stringify(inventory));
-        localStorage.setItem('mob_inv_history', JSON.stringify(history));
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    let inventory = [];
+
+    // --- REAL-TIME SYNC ---
+    db.collection("inventory").onSnapshot((snapshot) => {
+        inventory = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         render();
-    }
+    });
 
-    function addItemMaster() {
+    async function addItemMaster() {
         const code = document.getElementById('m-code').value.toUpperCase().trim();
         const desc = document.getElementById('m-desc').value.trim();
-        const min = parseInt(document.getElementById('m-min').value);
-        if(!code || isNaN(min)) return alert("Missing Info");
-        if(inventory.find(i => i.code === code)) return alert("Exists!");
-        inventory.push({ code, desc, min, qty: 0 });
-        saveData();
-        alert("Added!");
+        if(!code) return alert("Enter Code");
+        
+        await db.collection("inventory").doc(code).set({
+            code: code,
+            desc: desc,
+            qty: 0
+        });
+        alert("Item Created in Cloud!");
     }
 
-    function recordMovement() {
+    async function recordMovement() {
         const code = document.getElementById('move-code').value;
         const type = document.getElementById('move-type').value;
         const qty = parseInt(document.getElementById('move-qty').value);
-        const inv = document.getElementById('move-inv').value || "N/A";
-        const rem = document.getElementById('move-rem').value || "-";
-
         if(!code || isNaN(qty)) return alert("Select item/qty");
-        const item = inventory.find(i => i.code === code);
-        item.qty = (type === 'IN') ? item.qty + qty : item.qty - qty;
-        
-        history.unshift({
-            date: new Date().toLocaleString(),
-            code, type, qty, inv, rem
-        });
 
-        saveData();
-        alert("Posted!");
-        document.getElementById('move-qty').value = '';
+        const item = inventory.find(i => i.code === code);
+        const newQty = (type === 'IN') ? item.qty + qty : item.qty - qty;
+
+        await db.collection("inventory").doc(code).update({ qty: newQty });
+        alert("Cloud Updated!");
     }
 
     function render() {
-        const tbody = document.querySelector('#invTable tbody');
-        const select = document.querySelector('#move-code');
+        const tbody = document.getElementById('invTableBody');
+        const select = document.getElementById('move-code');
         const query = document.getElementById('searchInput').value.toLowerCase();
+        
         tbody.innerHTML = '';
         select.innerHTML = '<option value="">-- Select Item --</option>';
+
         inventory.forEach(item => {
             if (item.code.toLowerCase().includes(query) || item.desc.toLowerCase().includes(query)) {
-                const isLow = item.qty <= item.min;
                 tbody.innerHTML += `<tr>
                     <td><strong>${item.code}</strong><br><small>${item.desc}</small></td>
                     <td>${item.qty}</td>
-                    <td>${isLow ? '<span class="low-stock">LOW</span>' : 'OK'}</td>
                     <td><button class="btn-del" onclick="deleteItem('${item.code}')">🗑️</button></td>
                 </tr>`;
             }
@@ -183,65 +141,18 @@
         });
     }
 
-    function renderHistory() {
-        const hList = document.getElementById('historyList');
-        hList.innerHTML = history.length === 0 ? "No history yet." : "";
-        history.slice(0, 50).forEach(h => {
-            hList.innerHTML += `<div class="hist-item ${h.type==='IN'?'hist-in':'hist-out'}">
-                <strong>${h.date} - ${h.code}</strong><br>
-                ${h.type} ${h.qty} | Inv: ${h.inv}<br>
-                <small>${h.rem}</small>
-            </div>`;
-        });
+    async function deleteItem(code) {
+        if(confirm(`Delete ${code} from Cloud?`)) {
+            await db.collection("inventory").doc(code).delete();
+        }
     }
 
-    function deleteItem(code) { if(confirm(`Delete ${code}?`)) { inventory = inventory.filter(i => i.code !== code); saveData(); } }
-    function clearHistory() { if(confirm("Clear logs?")) { history = []; saveData(); renderHistory(); } }
-
-function importCSV() {
-        const file = document.getElementById('csvFile').files[0];
-        if(!file) return alert("Select file");
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const lines = e.target.result.split('\n');
-            let count = 0;
-            lines.forEach((line, i) => {
-                const parts = line.split(',');
-                if(parts.length >= 4) {
-                    const code = parts[0].trim().toUpperCase();
-                    
-                    // Skip if it's the header row or if code already exists
-                    if(code === "CODE" || inventory.find(inv => inv.code === code) || !code) return;
-
-                    // Clean the numbers (removes spaces, commas, and symbols)
-                    const cleanMin = parts[2].replace(/[^0-9.]/g, '');
-                    const cleanQty = parts[3].replace(/[^0-9.]/g, '');
-
-                    inventory.push({ 
-                        code: code, 
-                        desc: parts[1].trim(), 
-                        min: parseInt(cleanMin) || 0, 
-                        qty: parseInt(cleanQty) || 0 
-                    });
-                    count++;
-                }
-            });
-            saveData();
-            alert(`Successfully imported ${count} items with quantities!`);
-        };
-        reader.readAsText(file);
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        el.classList.add('active');
     }
-
-    function exportInventory() {
-        let csv = "Code,Description,Min,Qty\n";
-        inventory.forEach(i => csv += `${i.code},${i.desc},${i.min},${i.qty}\n`);
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'inventory.csv'; a.click();
-    }
-
-    render();
 </script>
 </body>
 </html>
-
