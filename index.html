@@ -25,6 +25,7 @@
         .low-stock { background: #fee2e2; color: #b91c1c; font-weight: bold; border-radius: 4px; padding: 2px 5px; }
         .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
         .hist-item { border-left: 4px solid var(--primary); padding: 10px; margin-bottom: 10px; font-size: 0.8rem; background: #fff; border-radius: 0 8px 8px 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .search-highlight { background: #fef9c3; font-weight: bold; padding: 2px; }
     </style>
 </head>
 <body>
@@ -46,7 +47,14 @@
         <div class="card">
             <h2>Batch Movement</h2>
             <input type="text" id="move-inv" placeholder="Invoice # / Reference">
-            <select id="move-code"></select>
+            
+            <label style="font-size: 0.8rem; color: #64748b; margin-bottom: 5px; display: block;">1. Find Item:</label>
+            <input type="text" id="moveSearch" placeholder="Type code or name..." onkeyup="filterMoveDropdown()">
+            
+            <select id="move-code">
+                <option value="">-- Start typing above --</option>
+            </select>
+
             <div style="display:flex; gap:10px;">
                 <select id="move-type" style="flex:1;"><option value="IN">IN (+)</option><option value="OUT">OUT (-)</option></select>
                 <input type="number" id="move-qty" placeholder="Qty" style="flex:1;" inputmode="numeric">
@@ -78,11 +86,6 @@
             <input type="number" id="m-min" placeholder="Min Stock">
             <button onclick="addItemMaster()">Add to Cloud</button>
         </div>
-        <div class="card">
-            <h2>Import CSV</h2>
-            <input type="file" id="csvFile" accept=".csv">
-            <button onclick="importCSV()">Upload to Cloud</button>
-        </div>
     </div>
 
     <div class="nav">
@@ -111,6 +114,7 @@
     db.collection("inventory").onSnapshot(snap => {
         inventory = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         render();
+        filterMoveDropdown(); // Update dropdown when data changes
     });
 
     db.collection("history").orderBy("timestamp", "desc").limit(50).onSnapshot(snap => {
@@ -118,13 +122,38 @@
         renderHistory();
     });
 
+    // NEW: Search filter for the movement dropdown
+    function filterMoveDropdown() {
+        const query = document.getElementById('moveSearch').value.toLowerCase();
+        const select = document.getElementById('move-code');
+        select.innerHTML = '';
+
+        const filtered = inventory.filter(item => 
+            item.code.toLowerCase().includes(query) || 
+            (item.desc && item.desc.toLowerCase().includes(query))
+        );
+
+        if (filtered.length === 0) {
+            select.innerHTML = '<option value="">No items found</option>';
+        } else {
+            filtered.sort((a,b)=>a.code.localeCompare(b.code)).forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.code;
+                option.textContent = `${item.code} - ${item.desc || ''}`;
+                select.appendChild(option);
+            });
+        }
+    }
+
     function addToCart() {
         const code = document.getElementById('move-code').value;
         const type = document.getElementById('move-type').value;
         const qty = parseInt(document.getElementById('move-qty').value);
-        if(!code || isNaN(qty)) return alert("Enter valid item/qty");
+        if(!code || isNaN(qty)) return alert("Select item and qty");
         cart.push({ code, type, qty });
         document.getElementById('move-qty').value = '';
+        document.getElementById('moveSearch').value = ''; // Reset search
+        filterMoveDropdown(); // Reset dropdown
         renderCart();
     }
 
@@ -140,13 +169,10 @@
         `).join('');
     }
 
-    function clearCart() { cart = []; renderCart(); }
-
     async function processBatch() {
         const inv = document.getElementById('move-inv').value || "Batch";
         const batch = db.batch();
         const dateNow = new Date().toLocaleString();
-
         cart.forEach(entry => {
             const item = inventory.find(i => i.code === entry.code);
             const newQty = (entry.type === 'IN') ? item.qty + entry.qty : item.qty - entry.qty;
@@ -156,36 +182,33 @@
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(), dateStr: dateNow
             });
         });
-
         await batch.commit();
-        alert("Success! All items updated.");
-        clearCart();
+        alert("Batch Synced!");
+        cart = []; renderCart();
         document.getElementById('move-inv').value = '';
     }
 
     function render() {
         const tbody = document.getElementById('invTableBody');
-        const select = document.getElementById('move-code');
         const q = document.getElementById('searchInput').value.toLowerCase();
-        tbody.innerHTML = ''; select.innerHTML = '<option value="">-- Select Item --</option>';
+        tbody.innerHTML = '';
         inventory.sort((a,b)=>a.code.localeCompare(b.code)).forEach(item => {
-            if(item.code.toLowerCase().includes(q)) {
+            if(item.code.toLowerCase().includes(q) || (item.desc && item.desc.toLowerCase().includes(q))) {
                 const low = item.qty <= (item.min || 0);
-                tbody.innerHTML += `<tr><td><strong>${item.code}</strong></td><td>${item.qty}</td><td>${low?'<span class="low-stock">LOW</span>':'OK'}</td><td><button class="btn-del" onclick="deleteItem('${item.code}')">🗑️</button></td></tr>`;
+                tbody.innerHTML += `<tr><td><strong>${item.code}</strong><br><small>${item.desc || ''}</small></td><td>${item.qty}</td><td>${low?'<span class="low-stock">LOW</span>':'OK'}</td><td><button class="btn-del" onclick="deleteItem('${item.code}')">🗑️</button></td></tr>`;
             }
-            select.innerHTML += `<option value="${item.code}">${item.code}</option>`;
         });
     }
 
     function renderHistory() {
-        document.getElementById('historyList').innerHTML = history.map(h => `<div class="hist-item" style="border-color:${h.type==='IN'?'#22c55e':'#ef4444'}"><strong>${h.dateStr}</strong> - ${h.code}<br>${h.type} ${h.qty} | Ref: ${h.inv}</div>`).join('');
+        document.getElementById('historyList').innerHTML = history.map(h => `<div class="hist-item" style="border-color:${h.type==='IN'?'#22c55e':'#ef4444'}"><strong>${h.dateStr}</strong> - ${h.code}<br>${h.type} ${h.qty} | Ref: ${h.inv}</div>`).join('') || "No logs.";
     }
 
     async function addItemMaster() {
         const code = document.getElementById('m-code').value.toUpperCase().trim();
         const desc = document.getElementById('m-desc').value.trim();
         const min = parseInt(document.getElementById('m-min').value) || 0;
-        if(!code) return;
+        if(!code) return alert("Code required");
         await db.collection("inventory").doc(code).set({ code, desc, min, qty: 0 });
         alert("Added!");
     }
@@ -203,24 +226,6 @@
         history.forEach(h => { csv += `"${h.dateStr}","${h.code}","${h.type}","${h.qty}","${h.inv}"\n`; });
         const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'history.csv'; a.click();
-    }
-
-    function importCSV() {
-        const file = document.getElementById('csvFile').files[0];
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-            const lines = e.target.result.split('\n');
-            for(let line of lines) {
-                const p = line.split(',');
-                if(p.length >= 3) {
-                    const c = p[0].trim().toUpperCase();
-                    if(c === "CODE" || !c) continue;
-                    await db.collection("inventory").doc(c).set({ code: c, desc: p[1].trim(), min: parseInt(p[2]) || 0, qty: parseInt(p[3]) || 0 });
-                }
-            }
-            alert("Import Complete!");
-        };
-        reader.readAsText(file);
     }
 </script>
 </body>
