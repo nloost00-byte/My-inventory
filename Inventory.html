@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Inventory</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --bg: #f1f5f9;
+        }
+        /* Mobile-first styles */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 10px; padding-bottom: 50px; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        
+        h2 { font-size: 1rem; margin-top: 0; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        /* Larger inputs for fingers */
+        input, select, button { 
+            width: 100%; 
+            padding: 14px; 
+            margin-bottom: 10px; 
+            border: 1px solid #cbd5e1; 
+            border-radius: 8px; 
+            font-size: 16px; /* Prevents iOS zoom-on-focus */
+            box-sizing: border-box;
+        }
+        
+        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
+        .btn-post { background: var(--success); }
+        .btn-csv { background: #64748b; font-size: 0.8rem; }
+
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 400px; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
+        
+        .low-stock { background: #fee2e2; color: #b91c1c; font-weight: bold; border-radius: 4px; padding: 2px 5px; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        /* Bottom Navigation Bar for Mobile */
+        .nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; border-top: 1px solid #e2e8f0; }
+        .nav-item { flex: 1; text-align: center; padding: 12px; font-size: 0.75rem; color: #64748b; cursor: pointer; }
+        .nav-item.active { color: var(--primary); font-weight: bold; border-top: 2px solid var(--primary); }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align:center; font-size: 1.2rem; color: var(--primary);">Inventory Pro Mobile</h1>
+
+    <div id="tab-dash" class="tab-content active">
+        <div class="card">
+            <h2>Stock Levels</h2>
+            <div class="table-container">
+                <table id="invTable">
+                    <thead><tr><th>Item</th><th>Qty</th><th>Status</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-move" class="tab-content">
+        <div class="card">
+            <h2>Record Movement</h2>
+            <select id="move-code"></select>
+            <select id="move-type">
+                <option value="IN">Stock IN (+)</option>
+                <option value="OUT">Stock OUT (-)</option>
+            </select>
+            <input type="number" id="move-qty" placeholder="Quantity" inputmode="numeric">
+            <input type="text" id="move-inv" placeholder="Invoice # / Supplier">
+            <input type="text" id="move-rem" placeholder="Remarks">
+            <button class="btn-post" onclick="recordMovement()">Submit Movement</button>
+        </div>
+    </div>
+
+    <div id="tab-setup" class="tab-content">
+        <div class="card">
+            <h2>Add New Item</h2>
+            <input type="text" id="m-code" placeholder="Item Code">
+            <input type="text" id="m-desc" placeholder="Description">
+            <input type="number" id="m-min" placeholder="Min Stock Level" inputmode="numeric">
+            <button onclick="addItemMaster()">Create Item</button>
+        </div>
+        <div class="card">
+            <h2>Data Tools</h2>
+            <input type="file" id="csvFile" accept=".csv" class="btn-csv">
+            <button class="btn-csv" onclick="importCSV()">Import CSV</button>
+            <button class="btn-csv" style="margin-top:5px;" onclick="exportInventory()">Export Inventory</button>
+        </div>
+    </div>
+
+    <div class="nav">
+        <div class="nav-item active" onclick="switchTab('tab-dash', this)">Levels</div>
+        <div class="nav-item" onclick="switchTab('tab-move', this)">Move</div>
+        <div class="nav-item" onclick="switchTab('tab-setup', this)">Settings</div>
+    </div>
+
+<script>
+    let inventory = JSON.parse(localStorage.getItem('mob_inv_master')) || [];
+    
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        el.classList.add('active');
+    }
+
+    function saveData() {
+        localStorage.setItem('mob_inv_master', JSON.stringify(inventory));
+        render();
+    }
+
+    function addItemMaster() {
+        const code = document.getElementById('m-code').value.toUpperCase().trim();
+        const desc = document.getElementById('m-desc').value.trim();
+        const min = parseInt(document.getElementById('m-min').value);
+        if(!code || isNaN(min)) return alert("Missing Info");
+        inventory.push({ code, desc, min, qty: 0 });
+        saveData();
+        alert("Item Added!");
+    }
+
+    function recordMovement() {
+        const code = document.getElementById('move-code').value;
+        const type = document.getElementById('move-type').value;
+        const qty = parseInt(document.getElementById('move-qty').value);
+        if(!code || isNaN(qty)) return alert("Select item/qty");
+        const item = inventory.find(i => i.code === code);
+        item.qty = (type === 'IN') ? item.qty + qty : item.qty - qty;
+        saveData();
+        alert("Success!");
+    }
+
+    function render() {
+        const tbody = document.querySelector('#invTable tbody');
+        const select = document.querySelector('#move-code');
+        tbody.innerHTML = '';
+        select.innerHTML = '<option value="">-- Select Item --</option>';
+        inventory.forEach(item => {
+            const isLow = item.qty <= item.min;
+            tbody.innerHTML += `<tr>
+                <td><strong>${item.code}</strong><br><small>${item.desc}</small></td>
+                <td>${item.qty}</td>
+                <td>${isLow ? '<span class="low-stock">LOW</span>' : 'OK'}</td>
+            </tr>`;
+            select.innerHTML += `<option value="${item.code}">${item.code}</option>`;
+        });
+    }
+
+    // CSV Functions (Same as previous but kept for completeness)
+    function exportInventory() {
+        let csv = "Item Code,Description,Qty,Min\n";
+        inventory.forEach(i => csv += `${i.code},${i.desc},${i.qty},${i.min}\n`);
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'inventory.csv'; a.click();
+    }
+
+    function importCSV() {
+        const file = document.getElementById('csvFile').files[0];
+        if(!file) return alert("Select file");
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const lines = e.target.result.split('\n');
+            lines.forEach((line, i) => {
+                if(i === 0) return;
+                const parts = line.split(',');
+                if(parts.length >= 3) {
+                    inventory.push({ code: parts[0].trim().toUpperCase(), desc: parts[1].trim(), min: parseInt(parts[2]), qty: 0 });
+                }
+            });
+            saveData();
+            alert("Imported!");
+        };
+        reader.readAsText(file);
+    }
+
+    render();
+</script>
+</body>
+</html>
