@@ -24,7 +24,7 @@
         th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
         .stock-badge { background: #e0f2fe; color: #0369a1; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px; border: 1px solid #bae6fd; }
         .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
-        .hist-item { border-left: 4px solid var(--primary); padding: 10px; margin-bottom: 10px; font-size: 0.8rem; background: #fff; border-radius: 0 8px 8px 0; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .hist-item { border-left: 4px solid var(--primary); padding: 10px; margin-bottom: 10px; font-size: 0.8rem; background: #fff; border-radius: 0 8px 8px 0; }
     </style>
 </head>
 <body>
@@ -46,24 +46,17 @@
         <div class="card">
             <h2 style="font-size:1rem; margin-top:0;">Batch Movement</h2>
             <input type="text" id="move-inv" placeholder="Invoice # / Reference">
-            
-            <label style="font-size: 0.75rem; color: #64748b;">1. Search Item</label>
             <input type="text" id="moveSearch" placeholder="Type code or description..." onkeyup="filterMoveDropdown()">
-            
-            <label style="font-size: 0.75rem; color: #64748b;">2. Select Result</label>
             <select id="move-code" onchange="updateStockPreview()">
                 <option value="">-- Start typing above --</option>
             </select>
-
             <div id="stockPreview" class="stock-badge" style="display:none;">Current Stock: --</div>
-
             <div style="display:flex; gap:10px;">
                 <select id="move-type" style="flex:1;"><option value="IN">IN (+)</option><option value="OUT">OUT (-)</option></select>
                 <input type="number" id="move-qty" placeholder="Qty" style="flex:1;" inputmode="numeric">
             </div>
             <button class="btn-add" onclick="addToCart()">+ Add to Batch List</button>
         </div>
-
         <div class="card" id="cartCard" style="display:none;">
             <h3 style="margin-top:0; font-size: 0.9rem;">Ready to Sync:</h3>
             <div id="cartList" style="margin-bottom:15px;"></div>
@@ -91,14 +84,30 @@
     </div>
 
     <div class="nav">
-        <div class="nav-item active" onclick="switchTab('tab-dash', this)">Levels</div>
-        <div class="nav-item" onclick="switchTab('tab-move', this)">Move</div>
-        <div class="nav-item" onclick="switchTab('tab-hist', this)">History</div>
-        <div class="nav-item" onclick="switchTab('tab-setup', this)">Settings</div>
+        <div id="nav-dash" class="nav-item active" onclick="switchTab('tab-dash', this)">Levels</div>
+        <div id="nav-move" class="nav-item" onclick="switchTab('tab-move', this)">Move</div>
+        <div id="nav-hist" class="nav-item" onclick="switchTab('tab-hist', this)">History</div>
+        <div id="nav-setup" class="nav-item" onclick="switchTab('tab-setup', this)">Settings</div>
     </div>
 
 <script>
-    // FIREBASE INITIALIZATION
+    // 1. THIS FUNCTION MUST EXIST FOR TABS TO WORK
+    function switchTab(tabId, el) {
+        // Hide all tabs
+        const contents = document.getElementsByClassName('tab-content');
+        for (let i = 0; i < contents.length; i++) {
+            contents[i].classList.remove('active');
+        }
+        // Deactivate all nav buttons
+        const navs = document.getElementsByClassName('nav-item');
+        for (let i = 0; i < navs.length; i++) {
+            navs[i].classList.remove('active');
+        }
+        // Show current tab and activate button
+        document.getElementById(tabId).classList.add('active');
+        el.classList.add('active');
+    }
+
     const firebaseConfig = {
       apiKey: "AIzaSyBUvFkq-IyvL4DhXYv_zODzqcEs-hmvxZI",
       authDomain: "my-inventory-e1eb4.firebaseapp.com",
@@ -114,26 +123,23 @@
     let history = [];
     let cart = [];
 
-    // REAL-TIME SYNC
     db.collection("inventory").onSnapshot(snap => {
         inventory = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         render();
         filterMoveDropdown();
         updateStockPreview();
-    }, error => console.error("Firebase Error:", error));
+    });
 
     db.collection("history").orderBy("timestamp", "desc").limit(50).onSnapshot(snap => {
         history = snap.docs.map(doc => doc.data());
         renderHistory();
     });
 
-    // SEARCH & PREVIEW FUNCTIONS
     function filterMoveDropdown() {
         const query = document.getElementById('moveSearch').value.toLowerCase();
         const select = document.getElementById('move-code');
         const currentVal = select.value;
         select.innerHTML = '<option value="">-- Select Item --</option>';
-        
         inventory.filter(i => i.code.toLowerCase().includes(query) || (i.desc && i.desc.toLowerCase().includes(query)))
                  .sort((a,b) => a.code.localeCompare(b.code))
                  .forEach(item => {
@@ -153,18 +159,14 @@
         if(item) {
             preview.innerText = `Current Cloud Stock: ${item.qty}`;
             preview.style.display = 'block';
-        } else {
-            preview.style.display = 'none';
         }
     }
 
-    // BATCH PROCESSING
     function addToCart() {
         const code = document.getElementById('move-code').value;
         const type = document.getElementById('move-type').value;
         const qty = parseInt(document.getElementById('move-qty').value);
-        if(!code || isNaN(qty)) return alert("Please select an item and enter quantity");
-
+        if(!code || isNaN(qty)) return alert("Select item and qty");
         cart.push({ code, type, qty });
         document.getElementById('move-qty').value = '';
         document.getElementById('moveSearch').value = '';
@@ -177,4 +179,77 @@
         const list = document.getElementById('cartList');
         const card = document.getElementById('cartCard');
         card.style.display = cart.length ? 'block' : 'none';
-        list.innerHTML =
+        list.innerHTML = cart.map((item, i) => `
+            <div class="cart-item">
+                <span><strong>${item.code}</strong> (${item.type} ${item.qty})</span>
+                <button class="btn-del" onclick="cart.splice(${i},1);renderCart();">X</button>
+            </div>
+        `).join('');
+    }
+
+    function clearCart() { cart = []; renderCart(); }
+
+    async function processBatch() {
+        const inv = document.getElementById('move-inv').value || "Batch";
+        const batch = db.batch();
+        const now = new Date().toLocaleString();
+        cart.forEach(entry => {
+            const item = inventory.find(i => i.code === entry.code);
+            const newQty = (entry.type === 'IN') ? item.qty + entry.qty : item.qty - entry.qty;
+            batch.update(db.collection("inventory").doc(entry.code), { qty: newQty });
+            batch.set(db.collection("history").doc(), {
+                code: entry.code, type: entry.type, qty: entry.qty, inv: inv,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(), dateStr: now
+            });
+        });
+        await batch.commit();
+        alert("Batch Synced!");
+        clearCart();
+    }
+
+    function render() {
+        const tbody = document.getElementById('invTableBody');
+        const q = document.getElementById('searchInput').value.toLowerCase();
+        tbody.innerHTML = '';
+        inventory.sort((a,b) => a.code.localeCompare(b.code)).forEach(item => {
+            if(item.code.toLowerCase().includes(q) || (item.desc && item.desc.toLowerCase().includes(q))) {
+                const low = item.qty <= (item.min || 0);
+                tbody.innerHTML += `<tr>
+                    <td><strong>${item.code}</strong><br><small>${item.desc || ''}</small></td>
+                    <td>${item.qty}</td>
+                    <td>${low ? '<span class="low-stock">LOW</span>' : 'OK'}</td>
+                    <td><button class="btn-del" onclick="deleteItem('${item.code}')">🗑️</button></td>
+                </tr>`;
+            }
+        });
+    }
+
+    function renderHistory() {
+        document.getElementById('historyList').innerHTML = history.map(h => `
+            <div class="hist-item" style="border-color:${h.type==='IN'?'#22c55e':'#ef4444'}">
+                <strong>${h.dateStr}</strong> - ${h.code}<br>
+                ${h.type} ${h.qty} | Ref: ${h.inv}
+            </div>
+        `).join('') || "No logs yet.";
+    }
+
+    async function addItemMaster() {
+        const code = document.getElementById('m-code').value.toUpperCase().trim();
+        const desc = document.getElementById('m-desc').value.trim();
+        const min = parseInt(document.getElementById('m-min').value) || 0;
+        if(!code) return alert("Code required");
+        await db.collection("inventory").doc(code).set({ code, desc, min, qty: 0 });
+        alert("Added!");
+    }
+
+    async function deleteItem(code) { if(confirm(`Delete ${code}?`)) await db.collection("inventory").doc(code).delete(); }
+
+    function exportHistoryCSV() {
+        let csv = "Date,Item,Type,Qty,Ref\n";
+        history.forEach(h => { csv += `"${h.dateStr}","${h.code}","${h.type}","${h.qty}","${h.inv}"\n`; });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'history.csv'; a.click();
+    }
+</script>
+</body>
+</html>
