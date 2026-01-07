@@ -4,40 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cloud Inventory Pro</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2897/2897808.png">
+    
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Inventory Pro","short_name":"InvPro","start_url":".","display":"standalone","background_color":"#f1f5f9","theme_color":"#2563eb","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/2897/2897808.png","sizes":"512x512","type":"image/png"}]}'>
+
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
     <style>
         :root { --primary: #2563eb; --danger: #ef4444; --success: #22c55e; --bg: #f1f5f9; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 10px; padding-bottom: 80px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 10px; padding-bottom: 80px; -webkit-tap-highlight-color: transparent; }
+        /* Prevent text selection while tapping buttons */
+        * { user-select: none; -webkit-user-select: none; }
+        input, select { user-select: text; -webkit-user-select: text; }
+
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; }
         input, select, button { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
-        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
+        button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+        button:active { opacity: 0.7; }
+        
         .btn-add { background: var(--primary); }
-        .btn-post { background: var(--success); margin-top: 15px; font-size: 1.1rem; }
+        .btn-post { background: var(--success); margin-top: 15px; font-size: 1.1rem; height: 55px; }
         .btn-del { background: #fee2e2; color: var(--danger); padding: 5px 10px; width: auto; font-size: 0.75rem; border-radius: 6px; border:none; }
-        .nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; border-top: 1px solid #e2e8f0; height: 70px; z-index: 100;}
-        .nav-item { flex: 1; text-align: center; padding-top: 20px; font-size: 0.8rem; color: #64748b; cursor: pointer; }
+        
+        .nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; border-top: 1px solid #e2e8f0; height: 75px; z-index: 100; padding-bottom: env(safe-area-inset-bottom); }
+        .nav-item { flex: 1; text-align: center; padding-top: 15px; font-size: 0.75rem; color: #64748b; cursor: pointer; }
         .nav-item.active { color: var(--primary); font-weight: bold; border-top: 3px solid var(--primary); }
-        .tab-content { display: none; }
+        
+        .tab-content { display: none; padding-top: 10px; }
         .tab-content.active { display: block; }
+        
         table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 10px 5px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
-        .stock-badge { background: #e0f2fe; color: #0369a1; padding: 8px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px; }
-        .cart-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ccc; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 12px 5px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
+        .stock-badge { background: #e0f2fe; color: #0369a1; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px; }
+        .cart-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #ccc; font-size: 0.9rem; }
         .hist-group { background: white; border-left: 5px solid var(--success); padding: 12px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .hist-header { display: flex; justify-content: space-between; font-weight: bold; color: #1e293b; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
     </style>
 </head>
 <body>
 
-    <h1 style="text-align:center; font-size: 1.2rem; color: var(--primary);">Cloud Inventory Pro</h1>
+    <h1 style="text-align:center; font-size: 1.1rem; color: var(--primary); margin: 10px 0;">Cloud Inventory Pro</h1>
 
     <div id="tab-dash" class="tab-content active">
         <div class="card">
             <h2>Inventory Levels</h2>
-            <input type="text" id="searchInput" placeholder="Search items..." onkeyup="render()">
+            <input type="text" id="searchInput" placeholder="Quick search..." onkeyup="render()">
             <table>
-                <thead><tr><th>Item</th><th>Qty</th><th>Status</th><th>Del</th></tr></thead>
+                <thead><tr><th>Item</th><th>Qty</th><th>Stat</th><th>Del</th></tr></thead>
                 <tbody id="invTableBody"></tbody>
             </table>
         </div>
@@ -45,30 +63,30 @@
 
     <div id="tab-move" class="tab-content">
         <div class="card">
-            <h2 id="nextBatchDisplay">New Batch Entry</h2>
-            <input type="text" id="move-inv" placeholder="External Ref / Invoice #">
-            <input type="text" id="moveSearch" placeholder="Search Item..." onkeyup="filterMoveDropdown()">
+            <h2 id="nextBatchDisplay">Batch #----</h2>
+            <input type="text" id="move-inv" placeholder="Inv / Ref #">
+            <input type="text" id="moveSearch" placeholder="Search item to add..." onkeyup="filterMoveDropdown()">
             <select id="move-code" onchange="updateStockPreview()"></select>
             <div id="stockPreview" class="stock-badge" style="display:none;"></div>
             <div style="display:flex; gap:10px;">
                 <select id="move-type" style="flex:1;"><option value="IN">IN (+)</option><option value="OUT">OUT (-)</option></select>
                 <input type="number" id="move-qty" placeholder="Qty" style="flex:1;" inputmode="numeric">
             </div>
-            <button class="btn-add" onclick="addToCart()">+ Add to Batch</button>
+            <button class="btn-add" onclick="addToCart()">+ Add to List</button>
         </div>
 
         <div class="card" id="cartCard" style="display:none;">
             <h3>Batch Preview</h3>
             <div id="cartList"></div>
-            <button class="btn-post" onclick="processBatch()">Post Complete Batch</button>
-            <button onclick="clearCart()" style="background:#64748b; margin-top:5px;">Discard</button>
+            <button class="btn-post" onclick="processBatch()">Sync Batch to Cloud</button>
+            <button onclick="clearCart()" style="background:#64748b; margin-top:5px;">Clear</button>
         </div>
     </div>
 
     <div id="tab-hist" class="tab-content">
         <div class="card">
-            <h2>Transaction Search</h2>
-            <input type="text" id="histSearch" placeholder="Search Batch #, Ref, or Item..." onkeyup="renderHistory()">
+            <h2>Batch History</h2>
+            <input type="text" id="histSearch" placeholder="Search batch, ref or item..." onkeyup="renderHistory()">
             <button onclick="exportHistoryCSV()" style="background:#64748b; margin-bottom:10px;">📥 Export CSV</button>
             <div id="historyList"></div>
         </div>
@@ -76,16 +94,16 @@
 
     <div id="tab-setup" class="tab-content">
         <div class="card">
-            <h2>Add New Master Item</h2>
-            <input type="text" id="m-code" placeholder="Item Code">
-            <input type="text" id="m-desc" placeholder="Description">
+            <h2>New Master Item</h2>
+            <input type="text" id="m-code" placeholder="Code">
+            <input type="text" id="m-desc" placeholder="Desc">
             <input type="number" id="m-min" placeholder="Min Stock">
-            <button onclick="addItemMaster()">Create Item</button>
+            <button onclick="addItemMaster()">Save Item</button>
         </div>
         <div class="card">
-            <h2>Bulk Import CSV</h2>
+            <h2>Import CSV</h2>
             <input type="file" id="csvFile" accept=".csv">
-            <button onclick="importCSV()" style="background:#64748b;">Upload & Overwrite Qty</button>
+            <button onclick="importCSV()" style="background:#64748b;">Upload & Overwrite</button>
         </div>
     </div>
 
@@ -101,6 +119,7 @@
         document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
         document.getElementById(t).classList.add('active'); el.classList.add('active');
+        window.scrollTo(0,0);
     }
 
     const firebaseConfig = {
@@ -126,7 +145,10 @@
 
     db.collection("history").orderBy("batchNum", "desc").limit(50).onSnapshot(snap => {
         history = snap.docs.map(doc => doc.data());
-        if(history.length > 0) lastBatchNum = Math.max(...history.map(h => h.batchNum || 1000));
+        if(history.length > 0) {
+            const nums = history.map(h => h.batchNum).filter(n => !isNaN(n));
+            lastBatchNum = nums.length > 0 ? Math.max(...nums) : 1000;
+        }
         document.getElementById('nextBatchDisplay').innerText = "New Batch #" + (lastBatchNum + 1);
         renderHistory();
     });
@@ -154,7 +176,7 @@
         const code = document.getElementById('move-code').value;
         const type = document.getElementById('move-type').value;
         const qty = parseInt(document.getElementById('move-qty').value);
-        if(!code || isNaN(qty)) return alert("Check inputs");
+        if(!code || isNaN(qty) || qty <= 0) return alert("Select item and enter valid qty");
         cart.push({ code, type, qty });
         document.getElementById('move-qty').value = '';
         renderCart();
@@ -165,7 +187,7 @@
         card.style.display = cart.length ? 'block' : 'none';
         document.getElementById('cartList').innerHTML = cart.map((item, i) => `
             <div class="cart-item">
-                <span>${item.code} (${item.type} ${item.qty})</span>
+                <span><strong>${item.code}</strong> (${item.type} ${item.qty})</span>
                 <button class="btn-del" onclick="cart.splice(${i},1);renderCart();">X</button>
             </div>
         `).join('');
@@ -174,6 +196,7 @@
     function clearCart() { cart = []; renderCart(); }
 
     async function processBatch() {
+        if(cart.length === 0) return;
         const batchId = lastBatchNum + 1;
         const extRef = document.getElementById('move-inv').value || "No Ref";
         const dbBatch = db.batch();
@@ -181,7 +204,7 @@
 
         cart.forEach(entry => {
             const item = inventory.find(i => i.code === entry.code);
-            const newQty = (entry.type === 'IN') ? item.qty + entry.qty : item.qty - entry.qty;
+            const newQty = (entry.type === 'IN') ? (item.qty + entry.qty) : (item.qty - entry.qty);
             dbBatch.update(db.collection("inventory").doc(entry.code), { qty: newQty });
         });
 
@@ -194,10 +217,13 @@
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        await dbBatch.commit();
-        alert("Batch #" + batchId + " Saved!");
-        clearCart();
-        document.getElementById('move-inv').value = '';
+        try {
+            await dbBatch.commit();
+            alert("Batch #" + batchId + " Saved Successfully!");
+            clearCart();
+            document.getElementById('move-inv').value = '';
+            document.getElementById('moveSearch').value = '';
+        } catch (e) { alert("Error saving: " + e.message); }
     }
 
     function render() {
@@ -205,8 +231,14 @@
         const q = document.getElementById('searchInput').value.toLowerCase();
         tbody.innerHTML = '';
         inventory.sort((a,b)=>a.code.localeCompare(b.code)).forEach(item => {
-            if(item.code.toLowerCase().includes(q)) {
-                tbody.innerHTML += `<tr><td><strong>${item.code}</strong></td><td>${item.qty}</td><td>${item.qty <= (item.min||0)?'LOW':'OK'}</td><td><button class="btn-del" onclick="deleteItem('${item.code}')">🗑️</button></td></tr>`;
+            if(item.code.toLowerCase().includes(q) || (item.desc && item.desc.toLowerCase().includes(q))) {
+                const low = item.qty <= (item.min || 0);
+                tbody.innerHTML += `<tr>
+                    <td><strong>${item.code}</strong><br><small>${item.desc || ''}</small></td>
+                    <td>${item.qty}</td>
+                    <td><span style="color:${low?'red':'green'}">${low?'LOW':'OK'}</span></td>
+                    <td><button class="btn-del" onclick="deleteItem('${item.code}')">🗑️</button></td>
+                </tr>`;
             }
         });
     }
@@ -215,36 +247,36 @@
         const q = document.getElementById('histSearch').value.toLowerCase();
         const list = document.getElementById('historyList');
         list.innerHTML = history.filter(h => {
-            const matchBatch = h.batchNum.toString().includes(q);
-            const matchRef = h.extRef.toLowerCase().includes(q);
-            const matchItem = h.items.some(i => i.code.toLowerCase().includes(q));
+            const matchBatch = h.batchNum && h.batchNum.toString().includes(q);
+            const matchRef = h.extRef && h.extRef.toLowerCase().includes(q);
+            const matchItem = h.items && h.items.some(i => i.code.toLowerCase().includes(q));
             return matchBatch || matchRef || matchItem;
         }).map(h => `
             <div class="hist-group">
                 <div class="hist-header">
                     <span>Batch #${h.batchNum}</span>
-                    <span style="font-size:0.7rem;">${h.date}</span>
+                    <span style="font-size:0.7rem; font-weight:normal;">${h.date}</span>
                 </div>
                 <div style="font-size:0.8rem; color:#64748b; margin-bottom:5px;">Ref: ${h.extRef}</div>
-                ${h.items.map(i => `<div style="font-size:0.8rem;">• ${i.code}: ${i.type} ${i.qty}</div>`).join('')}
+                ${h.items.map(i => `<div style="font-size:0.85rem; padding:2px 0;">• ${i.code}: ${i.type} ${i.qty}</div>`).join('')}
             </div>
-        `).join('');
+        `).join('') || "No matching history found.";
     }
 
     async function addItemMaster() {
         const code = document.getElementById('m-code').value.toUpperCase().trim();
         const desc = document.getElementById('m-desc').value.trim();
         const min = parseInt(document.getElementById('m-min').value) || 0;
-        if(!code) return;
+        if(!code) return alert("Code is required");
         await db.collection("inventory").doc(code).set({ code, desc, min, qty: 0 });
-        alert("Item Created!");
+        alert("Master Item Saved!");
     }
 
     async function deleteItem(code) { if(confirm(`Delete ${code}?`)) await db.collection("inventory").doc(code).delete(); }
 
     function importCSV() {
         const file = document.getElementById('csvFile').files[0];
-        if(!file) return alert("Select file");
+        if(!file) return alert("Please select a .csv file first");
         const reader = new FileReader();
         reader.onload = async function(e) {
             const lines = e.target.result.split('\n');
@@ -258,7 +290,7 @@
                     });
                 }
             }
-            alert("Sync Complete!");
+            alert("CSV Sync Finished!");
         };
         reader.readAsText(file);
     }
@@ -271,7 +303,7 @@
             });
         });
         const blob = new Blob([csv], { type: 'text/csv' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'BatchHistory.csv'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Inventory_History.csv'; a.click();
     }
 </script>
 </body>
