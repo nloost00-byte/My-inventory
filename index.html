@@ -15,7 +15,7 @@
         .btn-add { background: var(--primary); }
         .btn-post { background: var(--success); margin-top: 15px; font-size: 1.1rem; }
         .btn-del { background: #fee2e2; color: var(--danger); padding: 5px 10px; width: auto; font-size: 0.75rem; border-radius: 6px; border:none; }
-        .nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; border-top: 1px solid #e2e8f0; height: 70px; }
+        .nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; border-top: 1px solid #e2e8f0; height: 70px; z-index: 100;}
         .nav-item { flex: 1; text-align: center; padding-top: 20px; font-size: 0.8rem; color: #64748b; cursor: pointer; }
         .nav-item.active { color: var(--primary); font-weight: bold; border-top: 3px solid var(--primary); }
         .tab-content { display: none; }
@@ -35,7 +35,7 @@
     <div id="tab-dash" class="tab-content active">
         <div class="card">
             <h2>Inventory Levels</h2>
-            <input type="text" id="searchInput" placeholder="Search..." onkeyup="render()">
+            <input type="text" id="searchInput" placeholder="Search items..." onkeyup="render()">
             <table>
                 <thead><tr><th>Item</th><th>Qty</th><th>Status</th><th>Del</th></tr></thead>
                 <tbody id="invTableBody"></tbody>
@@ -52,7 +52,7 @@
             <div id="stockPreview" class="stock-badge" style="display:none;"></div>
             <div style="display:flex; gap:10px;">
                 <select id="move-type" style="flex:1;"><option value="IN">IN (+)</option><option value="OUT">OUT (-)</option></select>
-                <input type="number" id="move-qty" placeholder="Qty" style="flex:1;">
+                <input type="number" id="move-qty" placeholder="Qty" style="flex:1;" inputmode="numeric">
             </div>
             <button class="btn-add" onclick="addToCart()">+ Add to Batch</button>
         </div>
@@ -67,7 +67,8 @@
 
     <div id="tab-hist" class="tab-content">
         <div class="card">
-            <h2>Transaction Batches</h2>
+            <h2>Transaction Search</h2>
+            <input type="text" id="histSearch" placeholder="Search Batch #, Ref, or Item..." onkeyup="renderHistory()">
             <button onclick="exportHistoryCSV()" style="background:#64748b; margin-bottom:10px;">📥 Export CSV</button>
             <div id="historyList"></div>
         </div>
@@ -83,9 +84,8 @@
         </div>
         <div class="card">
             <h2>Bulk Import CSV</h2>
-            <p style="font-size:0.75rem; color:#666;">Format: Code, Description, MinStock, CurrentQty</p>
             <input type="file" id="csvFile" accept=".csv">
-            <button onclick="importCSV()" style="background:#64748b;">Upload & Overwrite</button>
+            <button onclick="importCSV()" style="background:#64748b;">Upload & Overwrite Qty</button>
         </div>
     </div>
 
@@ -119,13 +119,12 @@
     let cart = [];
     let lastBatchNum = 1000;
 
-    // LOAD DATA
     db.collection("inventory").onSnapshot(snap => {
         inventory = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         render(); filterMoveDropdown();
     });
 
-    db.collection("history").orderBy("batchNum", "desc").limit(20).onSnapshot(snap => {
+    db.collection("history").orderBy("batchNum", "desc").limit(50).onSnapshot(snap => {
         history = snap.docs.map(doc => doc.data());
         if(history.length > 0) lastBatchNum = Math.max(...history.map(h => h.batchNum || 1000));
         document.getElementById('nextBatchDisplay').innerText = "New Batch #" + (lastBatchNum + 1);
@@ -176,7 +175,7 @@
 
     async function processBatch() {
         const batchId = lastBatchNum + 1;
-        const extRef = document.getElementById('move-inv').value || "None";
+        const extRef = document.getElementById('move-inv').value || "No Ref";
         const dbBatch = db.batch();
         const timestamp = new Date().toLocaleString();
 
@@ -186,7 +185,6 @@
             dbBatch.update(db.collection("inventory").doc(entry.code), { qty: newQty });
         });
 
-        // Save as ONE history entry containing the whole list
         const histRef = db.collection("history").doc();
         dbBatch.set(histRef, {
             batchNum: batchId,
@@ -197,7 +195,7 @@
         });
 
         await dbBatch.commit();
-        alert("Batch #" + batchId + " Posted!");
+        alert("Batch #" + batchId + " Saved!");
         clearCart();
         document.getElementById('move-inv').value = '';
     }
@@ -214,7 +212,14 @@
     }
 
     function renderHistory() {
-        document.getElementById('historyList').innerHTML = history.map(h => `
+        const q = document.getElementById('histSearch').value.toLowerCase();
+        const list = document.getElementById('historyList');
+        list.innerHTML = history.filter(h => {
+            const matchBatch = h.batchNum.toString().includes(q);
+            const matchRef = h.extRef.toLowerCase().includes(q);
+            const matchItem = h.items.some(i => i.code.toLowerCase().includes(q));
+            return matchBatch || matchRef || matchItem;
+        }).map(h => `
             <div class="hist-group">
                 <div class="hist-header">
                     <span>Batch #${h.batchNum}</span>
@@ -232,13 +237,14 @@
         const min = parseInt(document.getElementById('m-min').value) || 0;
         if(!code) return;
         await db.collection("inventory").doc(code).set({ code, desc, min, qty: 0 });
-        alert("Master Item Created!");
+        alert("Item Created!");
     }
 
     async function deleteItem(code) { if(confirm(`Delete ${code}?`)) await db.collection("inventory").doc(code).delete(); }
 
     function importCSV() {
         const file = document.getElementById('csvFile').files[0];
+        if(!file) return alert("Select file");
         const reader = new FileReader();
         reader.onload = async function(e) {
             const lines = e.target.result.split('\n');
@@ -248,14 +254,11 @@
                     const c = p[0].trim().toUpperCase();
                     if(c === "CODE" || !c) continue;
                     await db.collection("inventory").doc(c).set({ 
-                        code: c, 
-                        desc: p[1].trim(), 
-                        min: parseInt(p[2]) || 0, 
-                        qty: parseInt(p[3]) || 0 
+                        code: c, desc: p[1].trim(), min: parseInt(p[2]) || 0, qty: parseInt(p[3]) || 0 
                     });
                 }
             }
-            alert("CSV Imported Successfully!");
+            alert("Sync Complete!");
         };
         reader.readAsText(file);
     }
