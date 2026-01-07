@@ -13,56 +13,70 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     
     <style>
-        :root { --primary: #2563eb; --danger: #ef4444; --success: #22c55e; --bg: #f1f5f9; }
+        :root { --primary: #2563eb; --danger: #ef4444; --success: #22c55e; --bg: #f1f5f9; --admin: #7c3aed; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 10px; padding-bottom: 90px; -webkit-tap-highlight-color: transparent; }
         * { user-select: none; -webkit-user-select: none; }
         input, select { user-select: text; -webkit-user-select: text; }
 
-        /* Splash Screen Style */
-        #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s; }
+        /* Auth Screen */
+        #auth-screen { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:10000; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px; box-sizing:border-box; text-align:center; }
+
+        /* Splash Screen */
+        #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; }
         .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-top: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* General UI */
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        h2 { font-size: 1rem; margin-top: 0; color: #1e293b; }
         input, select, button { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
-        button:active { opacity: 0.7; }
+        .btn-post { background: var(--success); height: 55px; font-size: 1.1rem; }
+        .admin-badge { background: #f3e8ff; color: var(--admin); padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; }
         
-        .btn-post { background: var(--success); margin-top: 15px; font-size: 1.1rem; height: 55px; }
-        .btn-del { background: #fee2e2; color: var(--danger); padding: 5px 10px; width: auto; font-size: 0.75rem; border:none; border-radius: 6px; }
-        
+        /* Navigation */
         .nav { position: fixed; bottom: 0; left: 0; width: 100%; background: white; display: flex; border-top: 1px solid #e2e8f0; height: 75px; z-index: 100; padding-bottom: env(safe-area-inset-bottom); }
         .nav-item { flex: 1; text-align: center; padding-top: 15px; font-size: 0.75rem; color: #64748b; }
         .nav-item.active { color: var(--primary); font-weight: bold; border-top: 3px solid var(--primary); }
-        
         .tab-content { display: none; padding-top: 10px; }
         .tab-content.active { display: block; }
         
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 12px 5px; border-bottom: 1px solid #f1f5f9; font-size: 0.85rem; }
-        .stock-badge { background: #e0f2fe; color: #0369a1; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px; }
-        .hist-group { background: white; border-left: 5px solid var(--success); padding: 12px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        
+        /* Activity List Styling */
+        .hist-group { background: white; border-left: 5px solid var(--success); padding: 12px; margin-bottom: 10px; border-radius: 8px; position: relative; }
+        .user-tag { font-size: 0.65rem; background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 10px; font-weight: bold; position: absolute; top: 12px; right: 12px; }
     </style>
 </head>
 <body>
 
-    <div id="loading-screen">
-        <img src="icon.png" alt="Logo" style="width: 120px; border-radius: 20px;">
-        <div class="spinner"></div>
-        <p style="color: var(--primary); font-weight: bold; margin-top: 20px;">Syncing with Cloud...</p>
+    <div id="auth-screen">
+        <img src="icon.png" style="width:120px; border-radius:20px; margin-bottom:20px;">
+        <h2>Inventory Login</h2>
+        <input type="email" id="auth-email" placeholder="Email Address">
+        <input type="password" id="auth-pass" placeholder="Password">
+        <button onclick="handleAuth()">Login / Sign Up</button>
     </div>
 
-    <h1 style="text-align:center; font-size: 1.1rem; color: var(--primary); margin: 10px 0;">Cloud Inventory Pro</h1>
+    <div id="loading-screen">
+        <div class="spinner"></div>
+        <p>Syncing Warehouse...</p>
+    </div>
+
+    <h1 style="text-align:center; font-size: 1.1rem; color: var(--primary); margin: 10px 0;">
+        Cloud Inventory Pro <span id="admin-indicator" style="display:none;" class="admin-badge">ADMIN</span>
+    </h1>
 
     <div id="tab-dash" class="tab-content active">
         <div class="card">
-            <h2>Inventory Levels</h2>
+            <h2 id="dash-title">Inventory Levels</h2>
             <input type="text" id="searchInput" placeholder="Search items..." onkeyup="render()">
             <table>
-                <thead><tr><th>Item</th><th>Qty</th><th>Stat</th><th>Del</th></tr></thead>
+                <thead><tr><th>Item</th><th>Qty</th><th>Stat</th></tr></thead>
                 <tbody id="invTableBody"></tbody>
             </table>
         </div>
@@ -71,64 +85,61 @@
     <div id="tab-move" class="tab-content">
         <div class="card">
             <h2 id="nextBatchDisplay">Batch #----</h2>
-            <input type="text" id="move-inv" placeholder="Inv / Ref #">
-            <input type="text" id="moveSearch" placeholder="Search item to add..." onkeyup="filterMoveDropdown()">
-            <select id="move-code" onchange="updateStockPreview()"></select>
-            <div id="stockPreview" class="stock-badge" style="display:none;"></div>
+            <input type="text" id="moveSearch" placeholder="Find item..." onkeyup="filterMoveDropdown()">
+            <select id="move-code"></select>
             <div style="display:flex; gap:10px;">
                 <select id="move-type" style="flex:1;"><option value="IN">IN (+)</option><option value="OUT">OUT (-)</option></select>
                 <input type="number" id="move-qty" placeholder="Qty" style="flex:1;" inputmode="numeric">
             </div>
             <button onclick="addToCart()">+ Add to List</button>
         </div>
-
         <div class="card" id="cartCard" style="display:none;">
             <h3>Batch Preview</h3>
-            <div id="cartList" style="margin-bottom:10px;"></div>
-            <button class="btn-post" onclick="processBatch()">Sync Batch to Cloud</button>
-            <button onclick="clearCart()" style="background:#64748b; margin-top:5px;">Clear</button>
+            <div id="cartList" style="margin-bottom:15px; font-size:0.9rem;"></div>
+            <button class="btn-post" onclick="processBatch()">Sync to Cloud</button>
         </div>
     </div>
 
     <div id="tab-hist" class="tab-content">
         <div class="card">
-            <h2>Batch History</h2>
-            <input type="text" id="histSearch" placeholder="Search history..." onkeyup="renderHistory()">
-            <button onclick="exportHistoryCSV()" style="background:#64748b; margin-bottom:10px;">📥 Export CSV</button>
+            <h2>Warehouse Activity</h2>
             <div id="historyList"></div>
         </div>
     </div>
 
     <div id="tab-setup" class="tab-content">
-        <div class="card">
-            <h2>New Master Item</h2>
-            <input type="text" id="m-code" placeholder="Code">
-            <input type="text" id="m-desc" placeholder="Desc">
-            <input type="number" id="m-min" placeholder="Min Stock">
-            <button onclick="addItemMaster()">Save Item</button>
+        <div class="card" style="border: 2px solid var(--primary);">
+            <h2>Warehouse Link</h2>
+            <p style="font-size:0.8rem;">Warehouse ID (Share with Team):</p>
+            <input type="text" id="warehouse-id-display" readonly style="background:#f8fafc; font-family:monospace; color:var(--primary);">
+            <hr>
+            <p style="font-size:0.8rem;">Join a Different Warehouse:</p>
+            <input type="text" id="join-id-input" placeholder="Paste ID here">
+            <button onclick="joinWarehouse()" style="background:#64748b;">Link Phone</button>
         </div>
+
         <div class="card">
-            <h2>Import CSV</h2>
+            <h2>Profile</h2>
+            <p id="user-display" style="font-size:0.85rem; margin-bottom:10px;"></p>
+            <button onclick="firebase.auth().signOut()" style="background:var(--danger);">Logout</button>
+        </div>
+
+        <div class="card">
+            <h2>Stock Import</h2>
             <input type="file" id="csvFile" accept=".csv">
-            <button onclick="importCSV()" style="background:#64748b;">Upload & Overwrite</button>
+            <button onclick="importCSV()" style="background:#64748b;">Upload CSV</button>
         </div>
     </div>
 
     <div class="nav">
         <div class="nav-item active" onclick="switchTab('tab-dash', this)">Levels</div>
         <div class="nav-item" onclick="switchTab('tab-move', this)">Move</div>
-        <div class="nav-item" onclick="switchTab('tab-hist', this)">History</div>
-        <div class="nav-item" onclick="switchTab('tab-setup', this)">Settings</div>
+        <div class="nav-item" onclick="switchTab('tab-hist', this)">Activity</div>
+        <div class="nav-item" onclick="switchTab('tab-setup', this)">Setup</div>
     </div>
 
 <script>
-    function switchTab(t, el) {
-        document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
-        document.getElementById(t).classList.add('active'); el.classList.add('active');
-        window.scrollTo(0,0);
-    }
-
+    const ADMIN_EMAIL = "nloost00@gmail.com";
     const firebaseConfig = {
       apiKey: "AIzaSyBUvFkq-IyvL4DhXYv_zODzqcEs-hmvxZI",
       authDomain: "my-inventory-e1eb4.firebaseapp.com",
@@ -140,104 +151,91 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    let currentUser = null;
+    let currentWarehouseID = null;
     let inventory = [];
     let history = [];
     let cart = [];
-    let lastBatchNum = 1000;
+    let unsubInv = null;
+    let unsubHist = null;
 
-    // Remove Splash Screen once data is loaded
-    let firstLoad = true;
-    function hideSplash() {
-        if(firstLoad) {
-            document.getElementById('loading-screen').style.opacity = '0';
-            setTimeout(() => document.getElementById('loading-screen').style.display = 'none', 500);
-            firstLoad = false;
+    auth.onAuthStateChanged(async user => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('loading-screen').style.display = 'flex';
+            document.getElementById('user-display').innerText = "Logged in: " + user.email;
+            
+            const userDoc = await db.collection("users").doc(user.uid).get();
+            currentWarehouseID = (userDoc.exists && userDoc.data().linkedWarehouse) ? userDoc.data().linkedWarehouse : user.uid;
+            
+            document.getElementById('warehouse-id-display').value = currentWarehouseID;
+            if (user.email === ADMIN_EMAIL) document.getElementById('admin-indicator').style.display = 'inline';
+            
+            startDataListeners();
+        } else {
+            document.getElementById('auth-screen').style.display = 'flex';
+        }
+    });
+
+    async function handleAuth() {
+        const e = document.getElementById('auth-email').value;
+        const p = document.getElementById('auth-pass').value;
+        try { await auth.signInWithEmailAndPassword(e, p); } catch { await auth.createUserWithEmailAndPassword(e, p); }
+    }
+
+    async function joinWarehouse() {
+        const id = document.getElementById('join-id-input').value.trim();
+        if(id && confirm("Switch to this warehouse?")) {
+            await db.collection("users").doc(currentUser.uid).set({ linkedWarehouse: id }, {merge:true});
+            location.reload();
         }
     }
 
-    db.collection("inventory").onSnapshot(snap => {
-        inventory = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        render(); filterMoveDropdown();
-        hideSplash();
-    });
+    function startDataListeners() {
+        const path = db.collection("warehouses").doc(currentWarehouseID);
+        if(unsubInv) unsubInv();
+        unsubInv = path.collection("inventory").onSnapshot(snap => {
+            inventory = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            render(); filterMoveDropdown();
+            document.getElementById('loading-screen').style.display = 'none';
+        });
 
-    db.collection("history").orderBy("batchNum", "desc").limit(50).onSnapshot(snap => {
-        history = snap.docs.map(doc => doc.data());
-        if(history.length > 0) {
+        if(unsubHist) unsubHist();
+        unsubHist = path.collection("history").orderBy("timestamp", "desc").limit(20).onSnapshot(snap => {
+            history = snap.docs.map(doc => doc.data());
             const nums = history.map(h => h.batchNum).filter(n => !isNaN(n));
-            lastBatchNum = nums.length > 0 ? Math.max(...nums) : 1000;
-        }
-        document.getElementById('nextBatchDisplay').innerText = "New Batch #" + (lastBatchNum + 1);
-        renderHistory();
-    });
-
-    function filterMoveDropdown() {
-        const query = document.getElementById('moveSearch').value.toLowerCase();
-        const select = document.getElementById('move-code');
-        select.innerHTML = '<option value="">-- Select Item --</option>';
-        inventory.filter(i => i.code.toLowerCase().includes(query) || (i.desc && i.desc.toLowerCase().includes(query)))
-                 .sort((a,b)=>a.code.localeCompare(b.code))
-                 .forEach(item => {
-                    select.innerHTML += `<option value="${item.code}">${item.code} - ${item.desc || ''}</option>`;
-                 });
+            const lastNum = nums.length > 0 ? Math.max(...nums) : 1000;
+            document.getElementById('nextBatchDisplay').innerText = "Batch #" + (lastNum + 1);
+            renderHistory();
+        });
     }
-
-    function updateStockPreview() {
-        const code = document.getElementById('move-code').value;
-        const preview = document.getElementById('stockPreview');
-        const item = inventory.find(i => i.code === code);
-        preview.style.display = item ? 'block' : 'none';
-        if(item) preview.innerText = `Current Stock: ${item.qty}`;
-    }
-
-    function addToCart() {
-        const code = document.getElementById('move-code').value;
-        const type = document.getElementById('move-type').value;
-        const qty = parseInt(document.getElementById('move-qty').value);
-        if(!code || isNaN(qty) || qty <= 0) return alert("Select item and enter valid qty");
-        cart.push({ code, type, qty });
-        document.getElementById('move-qty').value = '';
-        renderCart();
-    }
-
-    function renderCart() {
-        const card = document.getElementById('cartCard');
-        card.style.display = cart.length ? 'block' : 'none';
-        document.getElementById('cartList').innerHTML = cart.map((item, i) => `
-            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px dashed #ccc;">
-                <span><strong>${item.code}</strong> (${item.type} ${item.qty})</span>
-                <span style="color:red" onclick="cart.splice(${i},1);renderCart();">Delete</span>
-            </div>
-        `).join('');
-    }
-
-    function clearCart() { cart = []; renderCart(); }
 
     async function processBatch() {
         if(cart.length === 0) return;
-        const batchId = lastBatchNum + 1;
-        const extRef = document.getElementById('move-inv').value || "No Ref";
+        const batchNum = parseInt(document.getElementById('nextBatchDisplay').innerText.split('#')[1]);
         const dbBatch = db.batch();
-        const timestamp = new Date().toLocaleString();
+        const path = db.collection("warehouses").doc(currentWarehouseID);
 
         cart.forEach(entry => {
             const item = inventory.find(i => i.code === entry.code);
             const newQty = (entry.type === 'IN') ? (item.qty + entry.qty) : (item.qty - entry.qty);
-            dbBatch.update(db.collection("inventory").doc(entry.code), { qty: newQty });
+            dbBatch.update(path.collection("inventory").doc(entry.code), { qty: newQty });
         });
 
-        dbBatch.set(db.collection("history").doc(), {
-            batchNum: batchId, extRef: extRef, items: cart, date: timestamp,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        dbBatch.set(path.collection("history").doc(), {
+            batchNum: batchNum,
+            items: cart,
+            date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }),
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            user: currentUser.email
         });
 
-        try {
-            await dbBatch.commit();
-            alert("Batch #" + batchId + " Saved!");
-            clearCart();
-            document.getElementById('move-inv').value = '';
-            document.getElementById('moveSearch').value = '';
-        } catch (e) { alert("Error: " + e.message); }
+        await dbBatch.commit();
+        cart = []; document.getElementById('cartCard').style.display = 'none';
+        alert("Success: Batch #" + batchNum + " Synced.");
     }
 
     function render() {
@@ -247,73 +245,63 @@
         inventory.sort((a,b)=>a.code.localeCompare(b.code)).forEach(item => {
             if(item.code.toLowerCase().includes(q) || (item.desc && item.desc.toLowerCase().includes(q))) {
                 const low = item.qty <= (item.min || 0);
-                tbody.innerHTML += `<tr>
-                    <td><strong>${item.code}</strong><br><small>${item.desc || ''}</small></td>
-                    <td>${item.qty}</td>
-                    <td><span style="color:${low?'red':'green'}">${low?'LOW':'OK'}</span></td>
-                    <td><button class="btn-del" onclick="deleteItem('${item.code}')">X</button></td>
-                </tr>`;
+                tbody.innerHTML += `<tr><td><strong>${item.code}</strong></td><td>${item.qty}</td><td><span style="color:${low?'red':'green'}">${low?'LOW':'OK'}</span></td></tr>`;
             }
         });
     }
 
     function renderHistory() {
-        const q = document.getElementById('histSearch').value.toLowerCase();
-        const list = document.getElementById('historyList');
-        list.innerHTML = history.filter(h => {
-            return h.batchNum.toString().includes(q) || h.extRef.toLowerCase().includes(q) || 
-                   h.items.some(i => i.code.toLowerCase().includes(q));
-        }).map(h => `
+        document.getElementById('historyList').innerHTML = history.map(h => `
             <div class="hist-group">
-                <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:0.9rem;">
-                    <span>Batch #${h.batchNum}</span>
-                    <span style="font-weight:normal; font-size:0.75rem;">${h.date}</span>
-                </div>
-                <div style="font-size:0.8rem; color:#64748b; margin-bottom:5px;">Ref: ${h.extRef}</div>
+                <span class="user-tag">${h.user ? h.user.split('@')[0] : 'Admin'}</span>
+                <div style="font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Batch #${h.batchNum} <span style="font-weight:normal; font-size:0.7rem; color:#64748b;">• ${h.date}</span></div>
                 ${h.items.map(i => `<div style="font-size:0.8rem;">• ${i.code}: ${i.type} ${i.qty}</div>`).join('')}
             </div>
-        `).join('');
+        `).join('') || "<p style='text-align:center; color:#94a3b8;'>No recent activity.</p>";
     }
 
-    async function addItemMaster() {
-        const code = document.getElementById('m-code').value.toUpperCase().trim();
-        const desc = document.getElementById('m-desc').value.trim();
-        const min = parseInt(document.getElementById('m-min').value) || 0;
-        if(!code) return alert("Code required");
-        await db.collection("inventory").doc(code).set({ code, desc, min, qty: 0 });
-        alert("Saved!");
+    function switchTab(t, el) {
+        document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
+        document.getElementById(t).classList.add('active'); el.classList.add('active');
     }
 
-    async function deleteItem(code) { if(confirm(`Delete ${code}?`)) await db.collection("inventory").doc(code).delete(); }
+    function filterMoveDropdown() {
+        const q = document.getElementById('moveSearch').value.toLowerCase();
+        const select = document.getElementById('move-code');
+        select.innerHTML = '<option value="">-- Select Item --</option>';
+        inventory.filter(i => i.code.toLowerCase().includes(q) || (i.desc && i.desc.toLowerCase().includes(q))).forEach(item => {
+            select.innerHTML += `<option value="${item.code}">${item.code}</option>`;
+        });
+    }
 
-    function importCSV() {
+    function addToCart() {
+        const c = document.getElementById('move-code').value;
+        const t = document.getElementById('move-type').value;
+        const q = parseInt(document.getElementById('move-qty').value);
+        if(!c || !q) return;
+        cart.push({ code: c, type: t, qty: q });
+        document.getElementById('cartCard').style.display = 'block';
+        document.getElementById('cartList').innerHTML = cart.map(i => `• ${i.code}: ${i.type} ${i.qty}`).join('<br>');
+    }
+
+    async function importCSV() {
         const file = document.getElementById('csvFile').files[0];
-        if(!file) return alert("Select CSV");
         const reader = new FileReader();
         reader.onload = async function(e) {
             const lines = e.target.result.split('\n');
+            const path = db.collection("warehouses").doc(currentWarehouseID).collection("inventory");
             for(let line of lines) {
                 const p = line.split(',');
-                if(p.length >= 4) {
-                    const c = p[0].trim().toUpperCase();
-                    if(c === "CODE" || !c) continue;
-                    await db.collection("inventory").doc(c).set({ 
-                        code: c, desc: p[1].trim(), min: parseInt(p[2]) || 0, qty: parseInt(p[3]) || 0 
+                if(p.length >= 4 && p[0].trim().toUpperCase() !== "CODE") {
+                    await path.doc(p[0].trim().toUpperCase()).set({ 
+                        code: p[0].trim().toUpperCase(), desc: p[1].trim(), min: parseInt(p[2]) || 0, qty: parseInt(p[3]) || 0 
                     });
                 }
             }
-            alert("CSV Sync Finished!");
+            alert("Inventory Overwritten Successfully.");
         };
         reader.readAsText(file);
-    }
-
-    function exportHistoryCSV() {
-        let csv = "Batch#,Date,Reference,Item,Type,Qty\n";
-        history.forEach(h => {
-            h.items.forEach(i => { csv += `${h.batchNum},${h.date},${h.extRef},${i.code},${i.type},${i.qty}\n`; });
-        });
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'History.csv'; a.click();
     }
 </script>
 </body>
